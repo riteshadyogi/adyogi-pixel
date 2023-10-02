@@ -17,7 +17,7 @@
 const handle = async function (name, event) {
     console.log('handler called');
     console.log(name);
-    console.log(event);
+    console.log(JSON.stringify(event));
 };
 
 module.exports = {
@@ -73,7 +73,6 @@ const READY_STATE_COMPLETE = 'complete';
     if (w.agdl) {
         if (typeof w.agdl.handlerMethod !== 'function') {
             w.agdl.handlerMethod = function () {
-                console.log('defined handler method called');
                 handlers.handle(arguments[0], arguments[1]);
             }
         }
@@ -88,7 +87,6 @@ const READY_STATE_COMPLETE = 'complete';
         // process events already present in queue
         while (w.agdl.queue.length > 0) {
             const event = w.agdl.queue.shift();
-            console.log('removed event from queue and processing it');
             handlers.handle(event[0], event[1]);
         }
     }
