@@ -69,6 +69,15 @@ const handlers = __webpack_require__(/*! ./handlers */ "./src/handlers/index.js"
 const READY_STATE_COMPLETE = 'complete';
 
 (function (w, d) {
+    // first things first, define an handler method on the agdl object
+    if (w.agdl) {
+        if (typeof w.agdl.handlerMethod !== 'function') {
+            w.agdl.handlerMethod = function () {
+                console.log('defined handler method called');
+                handlers.handle(arguments[0], arguments[1]);
+            }
+        }
+    }
     if (d.readyState === READY_STATE_COMPLETE) {
         console.log('Adyogi GTM Suite: Document loaded successfully');
         // if agdl is not defined, we can't do anything
@@ -76,12 +85,11 @@ const READY_STATE_COMPLETE = 'complete';
             console.error('Adyogi GTM Suite: agdl is not defined');
             return;
         }
-        while (true) {
-            while (w.agdl.queue.length > 0) {
-                const event = w.agdl.queue.shift();
-                console.log('removed event from queue and processing it');
-                console.log(event);
-            }
+        // process events already present in queue
+        while (w.agdl.queue.length > 0) {
+            const event = w.agdl.queue.shift();
+            console.log('removed event from queue and processing it');
+            handlers.handle(event[0], event[1]);
         }
     }
 })(window, document);
