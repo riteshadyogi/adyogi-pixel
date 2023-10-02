@@ -70,6 +70,9 @@ if (window) {
     const AdyogiGtmSuiteListener = {
         handlers: handlers,
     };
+    console.log('Adyogi GTM Suite Listener instantiation, window object is');
+    console.log(window);
+    console.log(AdyogiGtmSuiteListener);
     if (window.AdyogiGtmSuiteListener) {
         console.log('Going to instantiate `AdyogiGtmSuiteListener`. Adyogi Listener is predfined: Overwrite existing');
         console.log(window.AdyogiGtmSuiteListener);
