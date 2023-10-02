@@ -66,19 +66,25 @@ var __webpack_exports__ = {};
 
 const handlers = __webpack_require__(/*! ./handlers */ "./src/handlers/index.js");
 
-if (window) {
-    const AdyogiGtmSuiteListener = {
-        handlers: handlers,
-    };
-    console.log('Adyogi GTM Suite Listener instantiation, window object is');
-    console.log(window);
-    console.log(AdyogiGtmSuiteListener);
-    if (window.AdyogiGtmSuiteListener) {
-        console.log('Going to instantiate `AdyogiGtmSuiteListener`. Adyogi Listener is predfined: Overwrite existing');
-        console.log(window.AdyogiGtmSuiteListener);
+const READY_STATE_COMPLETE = 'complete';
+
+(function (w, d) {
+    if (d.readyState === READY_STATE_COMPLETE) {
+        console.log('Adyogi GTM Suite: Document loaded successfully');
+        // if agdl is not defined, we can't do anything
+        if (!w.agdl) {
+            console.error('Adyogi GTM Suite: agdl is not defined');
+            return;
+        }
+        while (true) {
+            while (w.agdl.queue.length > 0) {
+                const event = w.agdl.queue.shift();
+                console.log('removed event from queue and processing it');
+                console.log(event);
+            }
+        }
     }
-    window.AdyogiGtmSuiteListener = AdyogiGtmSuiteListener;
-}
+})(window, document);
 })();
 
 /******/ })()
