@@ -17414,9 +17414,24 @@ const lineItemsToItems = function (lineItems) {
         }
         items.push(i);
     }
+    return items;
 };
 
-const productVariantsToItems = function (productVariants) {};
+const productVariantsToItems = function (productVariants) {
+    const items = [];
+    for (const pv of productVariants) {
+        const i = { id: pv.id, name: pv.title };
+        if (_.has(pv, 'product')) {
+            i.brand = pv.product.vendor;
+            i.category = pv.product.type;
+        }
+        if (_.has(pv, 'price')) {
+            i.price = pv.price.amount;
+        }
+        items.push(i);
+    }
+    return items;
+};
 
 // following details are collected for each event
 // add to cart --> currency, value, items
@@ -17445,8 +17460,8 @@ const collectEcommerceDetails = function (name, event) {
             items = lineItemsToItems([event.data.cartLine]);
         }
         if (_.has(event, 'data.cartLine.cost.totalAmount')) {
-            currency: event.data.cartLine.cost.totalAmount.currencyCode;
-            value: event.data.cartLine.cost.totalAmount.amount;
+            currency = event.data.cartLine.cost.totalAmount.currencyCode;
+            value = event.data.cartLine.cost.totalAmount.amount;
         }
     }
     if (
@@ -17473,8 +17488,8 @@ const collectEcommerceDetails = function (name, event) {
     }
     if (name == PIXEL_EVENT_NAME_COPY.CART_VIEW) {
         if (_.has(event, 'data.cart.cost.totalAmount')) {
-            currency: event.data.cart.cost.totalAmount.currencyCode;
-            value: event.data.cart.cost.totalAmount.amount;
+            currency = event.data.cart.cost.totalAmount.currencyCode;
+            value = event.data.cart.cost.totalAmount.amount;
         }
         if (_.has(event, 'data.cart.lines')) {
             items = lineItemsToItems(event.data.cart.lines);
@@ -17494,8 +17509,8 @@ const collectEcommerceDetails = function (name, event) {
             i.brand = event.data.productVariant.product.vendor;
             i.category = event.data.productVariant.product.type;
         }
-        if (_.has(li, 'productVariant.price')) {
-            i.price = li.productVariant.price.amount;
+        if (_.has(event, 'data.productVariant.price')) {
+            i.price = event.data.productVariant.price.amount;
         }
         items = [i];
     }
@@ -17506,7 +17521,7 @@ const collectEcommerceDetails = function (name, event) {
         }
         if (_.has(event, 'data.collection.productVariants')) {
             items = productVariantsToItems(event.data.collection.productVariants);
-            if (items.length > 0) {
+            if (items && items.length > 0) {
                 const v = event.data.collection.productVariants[0];
                 if (v.price) {
                     currency = v.price.currencyCode;
