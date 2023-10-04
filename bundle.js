@@ -17293,7 +17293,6 @@ module.exports = {
   \********************************/
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-/* module decorator */ module = __webpack_require__.nmd(module);
 /**
  * Helper module, to collect device and marketing information
  */
@@ -17552,11 +17551,10 @@ const prepareEventSchema = async function (name, event) {
 // the event schema is internally defined. see gateway.js
 const generateDataLayerSchema = function (event) {};
 
-module.export = {
+module.exports = {
     storeData: storeData,
     fetchData: fetchData,
     prepareEventSchema: prepareEventSchema,
-    generateDataLayerSchema,
     generateDataLayerSchema,
     StoreKeys: StoreKeys,
 };
@@ -17607,7 +17605,7 @@ const handle = async function (name, event) {
     init().then(() => {
         console.info('Adyogi GTM Site: Init Success');
     }).catch((error) => {
-        console.error('Adyogi GTM Suite: Init Failed');
+        console.error('Adyogi GTM Suite: Init Failed', error);
     });
 })();
 
