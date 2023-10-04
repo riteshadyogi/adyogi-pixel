@@ -17521,6 +17521,20 @@ const collectEcommerceDetails = function (name, event) {
             pathname = l.pathname;
         }
     }
+
+    return {
+        currency,
+        value,
+        items,
+        metadata: {
+            transactionId: ti,
+            tax: tax,
+            itemListName: iln,
+            itemListId: ili,
+            url: url,
+            pathname: pathname,
+        },
+    };
 };
 
 // helper function to temporarily store some data against a key
