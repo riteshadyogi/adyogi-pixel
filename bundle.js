@@ -17516,8 +17516,9 @@ const collectEcommerceDetails = function (name, event) {
     }
     if (name === PIXEL_EVENT_NAME_COPY.PAGE_VIEW) {
         if (_.has(event, 'context.window')) {
-            url = event.context.window.location;
-            pathname = new URL(url).pathname;
+            const l = event.context.window.location;
+            url = l.href;
+            pathname = l.pathname;
         }
     }
 };
