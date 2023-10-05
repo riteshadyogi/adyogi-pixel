@@ -17279,8 +17279,6 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
 // for event schema see above
 const trigger = async function trigger(event) {
     const gtm = await helper.generateDataLayerSchema(event);
-    console.log('gateway gtm schema');
-    console.log(gtm);
     if (window.dataLayer) {
         window.dataLayer.push(gtm);
     }
@@ -17801,37 +17799,49 @@ const generateDataLayerCommonProps = async function (event) {
     common[FacebookUserDataParameterNames.FBC] = event.marketing.fbc;
     common[FacebookUserDataParameterNames.FBP] = event.marketing.fbp;
     if (event.customer.email) {
-        common[FacebookUserDataParameterNames.EMAIL] = await generateSha256Hash(event.customer.email);
+        common[FacebookUserDataParameterNames.EMAIL] = await generateSha256Hash(
+            event.customer.email.trim().toLowerCase()
+        );
     }
     if (event.customer.phone) {
         common[FacebookUserDataParameterNames.PHONE] = await generateSha256Hash(event.customer.phone);
     }
 
     if (event.customer.firstName) {
-        common[FacebookUserDataParameterNames.FIRST_NAME] = await generateSha256Hash(event.customer.firstName);
+        common[FacebookUserDataParameterNames.FIRST_NAME] = await generateSha256Hash(
+            event.customer.firstName.trim().toLowerCase()
+        );
     }
 
     if (event.customer.lastName) {
-        common[FacebookUserDataParameterNames.LAST_NAME] = await generateSha256Hash(event.customer.lastName);
+        common[FacebookUserDataParameterNames.LAST_NAME] = await generateSha256Hash(
+            event.customer.lastName.trim().toLowerCase()
+        );
     }
 
     if (event.customer.city) {
-        common[FacebookUserDataParameterNames.CITY] = await generateSha256Hash(event.customer.city);
+        common[FacebookUserDataParameterNames.CITY] = await generateSha256Hash(
+            event.customer.city.trim().toLowerCase()
+        );
     }
 
     if (event.customer.zip) {
-        common[FacebookUserDataParameterNames.ZIP] = await generateSha256Hash(event.customer.zip);
+        common[FacebookUserDataParameterNames.ZIP] = await generateSha256Hash(event.customer.zip.trim().toLowerCase());
     }
 
     if (event.customer.country) {
-        common[FacebookUserDataParameterNames.COUNTRY] = await generateSha256Hash(event.customer.country);
+        common[FacebookUserDataParameterNames.COUNTRY] = await generateSha256Hash(
+            event.customer.country.trim().toLowerCase()
+        );
     }
 
     if (event.customer.state) {
-        common[FacebookUserDataParameterNames.STATE] = await generateSha256Hash(event.customer.state);
+        common[FacebookUserDataParameterNames.STATE] = await generateSha256Hash(
+            event.customer.state.trim().toLowerCase()
+        );
     }
     if (event.customer.id) {
-        common[FacebookUserDataParameterNames.EXTERNAL_ID] = event.customer.id;
+        common[FacebookUserDataParameterNames.EXTERNAL_ID] = await generateSha256Hash(event.customer.id);
     }
     if (event.customer.ip) {
         common[FacebookUserDataParameterNames.CLIENT_IP_ADDRESS] = event.customer.ip;
@@ -17921,8 +17931,6 @@ const handle = async function (name, event) {
         return;
     }
     const schema = await helper.prepareEventSchema(name, event);
-    console.log('handler event schema');
-    console.log(schema);
     await gateway.trigger(schema);
 };
 
