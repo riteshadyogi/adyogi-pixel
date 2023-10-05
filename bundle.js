@@ -17239,6 +17239,8 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
  *      marketing: {
  *          userId: the unique user id, if available
  *          sessionId: the unique session id, either one of them should be available
+ *          fbc: The facebook click id if available
+ *          fbp: The facebook browser id if available
  *      }
  *      customer: {
  *          id: id, if available
@@ -17262,6 +17264,7 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
  *          viewport: the viewport size
  *          language: the language
  *          encoding: the encoding scheme used on page
+ *          userAgent: the user agent
  *      }
  *      ecommerce: {
  *          currency: the currency code of store
@@ -17276,6 +17279,8 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
 // for event schema see above
 const trigger = async function trigger(event) {
     const gtm = helper.generateDataLayerSchema(event);
+    console.log('gateway gtm schema');
+    console.log(gtm);
     if (window.dataLayer) {
         window.dataLayer.push(gtm);
     }
@@ -17320,6 +17325,9 @@ const PIXEL_EVENT_NAME_COPY = {
 
 // change it to true to convert shopify event id to a hashed value
 const GENERATE_EVENT_ID_HASH = false;
+const EMPTY_STRING = '';
+const FBP_COOKIE_NAME = '_fbp';
+const FBC_COOKIE_NAME = '_fbc';
 
 // store keys
 const StoreKeys = {
@@ -17363,6 +17371,7 @@ const collectCustomerDetails = function (name, event) {
 const collectDeviceDetails = function (name, event) {
     const language = event.context.navigator.language;
     const encoding = event.context.document.characterSet;
+    const userAgent = event.context.navigator.userAgent;
     const viewport = {
         w: event.context.window.innerWidth,
         h: event.context.window.innerHeight,
@@ -17371,26 +17380,26 @@ const collectDeviceDetails = function (name, event) {
         w: event.context.window.outerWidth,
         h: event.context.window.outerHeight,
     };
-    return { resolution, viewport, language, encoding };
+    return { resolution, viewport, language, encoding, userAgent };
 };
 
 const collectMarketingDetails = function (name, event) {
-    // this method doesn't return anything
     // we are sending unique client id in customer details
     // that unique id can be used as external id
-    return {};
+    const fbp = getCookieByName(FBP_COOKIE_NAME);
+    const fbc = getCookieByName(FBC_COOKIE_NAME);
+    return { fbc, fbp };
 };
 
-// generate sha-1 hash of the given value using web crypto apis
-// TODO: need to be tested
-const generateSha1Hash = async function (value) {
+// generate sha-256 hash of the given value using web crypto apis
+const generateSha256Hash = async function (value) {
     const buffer = new TextEncoder('utf-8').encode(value);
-    const bytes = await crypto.subtle.digest('SHA-1', buffer);
+    const bytes = await crypto.subtle.digest('SHA-256', buffer);
     return [...new Uint8Array(bytes)].map((x) => x.toString(16).padStart(2, '0')).join('');
 };
 
 const collectEventDetails = async function (name, event) {
-    const id = GENERATE_EVENT_ID_HASH ? await generateSha1Hash(event.id) : event.id;
+    const id = GENERATE_EVENT_ID_HASH ? await generateSha256Hash(event.id) : event.id;
     return {
         name: name,
         id: id,
@@ -17471,6 +17480,7 @@ const collectEcommerceDetails = function (name, event) {
         ti = null,
         url = null,
         pathname = null,
+        documentTitle = null,
         iln = null,
         searchTerm = null,
         ili = null;
@@ -17555,6 +17565,9 @@ const collectEcommerceDetails = function (name, event) {
             url = l.href;
             pathname = l.pathname;
         }
+        if (_.has(event, 'context.document')) {
+            documentTitle = event.context.document.title;
+        }
     }
 
     if (name === PIXEL_EVENT_NAME_COPY.SEARCH) {
@@ -17575,6 +17588,7 @@ const collectEcommerceDetails = function (name, event) {
             url: url,
             pathname: pathname,
             searchTerm: searchTerm,
+            documentTitle: documentTitle,
         },
     };
 };
@@ -17601,12 +17615,267 @@ const prepareEventSchema = async function (name, event) {
     const e = await collectEventDetails(name, event);
     const ecom = collectEcommerceDetails(name, event);
 
-    return { marketing, customer, event: e, device, ecom };
+    return { marketing, customer, event: e, device, ecommerce: ecom };
+};
+
+// a mapping of application Event names to google event names
+const GOOGLE_EVENT_NAMES_MAPPING = {
+    PAGE_VIEW: 'page_view',
+    PRODUCT_VIEW: 'view_item',
+    COLLECTION_VIEW: 'view_item_list',
+    CART_VIEW: 'view_cart',
+    SEARCH: 'search',
+    ADD_TO_CART: 'add_to_cart',
+    REMOVE_FROM_CART: 'remove_from_cart',
+    PAYMENT_INFO_SUBMITTED: 'add_payment_info',
+    SHIPPING_INFO_SUBMITTED: 'add_shipping_info',
+    BEGIN_CHECKOUT: 'begin_checkout',
+    PURCHASE: 'purchase',
+};
+
+// a mapping of application Event names to facebook event names
+const FACEBOOK_EVENT_NAMES_MAPPING = {
+    PAGE_VIEW: 'PageView',
+    PRODUCT_VIEW: 'ViewContent',
+    COLLECTION_VIEW: 'ViewContent',
+    CART_VIEW: 'ViewContent',
+    SEARCH: 'Search',
+    ADD_TO_CART: 'AddToCart',
+    REMOVE_FROM_CART: 'RemoveFromCart',
+    PAYMENT_INFO_SUBMITTED: 'AddPaymentInfo',
+    SHIPPING_INFO_SUBMITTED: 'AddShippingInfo',
+    BEGIN_CHECKOUT: 'BeginCheckout',
+    PURCHASE: 'Purchase',
+};
+
+// private helper method to resolve google event name
+const resolveGoogleEventName = function (event) {
+    const name = event.event.name;
+    if (GOOGLE_EVENT_NAMES_MAPPING[name]) {
+        return GOOGLE_EVENT_NAMES_MAPPING[name];
+    }
+    // if we failed to resolve return invalid event
+    return EMPTY_STRING;
+};
+
+// private helper method to resolve facebook event name
+const resolveFacebookEventName = function (event) {
+    const name = event.event.name;
+    if (FACEBOOK_EVENT_NAMES_MAPPING[name]) {
+        return FACEBOOK_EVENT_NAMES_MAPPING[name];
+    }
+    // if we failed to resolve return invalid event
+    return EMPTY_STRING;
+};
+
+// helper method to generate data layer google props from event schema
+const generateDataLayerGoogleProps = function (event) {
+    const googleProps = {
+        event: resolveGoogleEventName(event),
+        currency: event.ecommerce.currency,
+        value: event.ecommerce.value,
+    };
+    googleProps['event_id'] = event.event.id;
+    googleProps['item_list_name'] = event.ecommerce.metadata.itemListName;
+    googleProps['item_list_id'] = event.ecommerce.metadata.itemListId;
+
+    if (event.ecommerce.items) {
+        const items = [];
+        for (const ei of event.ecommerce.items) {
+            const i = {};
+            i['item_id'] = ei.id;
+            i['item_name'] = ei.name;
+            i['item_brand'] = ei.brand;
+            i['item_category'] = ei.category;
+            i['price'] = ei.price;
+            i['quantity'] = ei.quantity || 1;
+            items.push(i);
+        }
+        googleProps['items'] = items;
+    }
+    googleProps['transaction_id'] = event.ecommerce.metadata.transactionId;
+    googleProps['tax'] = event.ecommerce.metadata.tax;
+    googleProps['page_location'] = event.ecommerce.metadata.url;
+    googleProps['page_title'] = event.ecommerce.metadata.documentTitle;
+    googleProps['search_term'] = event.ecommerce.metadata.searchTerm;
+    return googleProps;
+};
+
+// helper method to generate data layer facebook props from event schema
+const generateDataLayerFacebookProps = function (event) {
+    const fbProps = {
+        fbEvent: resolveFacebookEventName(event),
+    };
+    fbProps['value'] = event.ecommerce.value;
+    fbProps['currency'] = event.ecommerce.currency;
+    if (event.ecommerce.items) {
+        fbProps['content_ids'] = event.ecommerce.items.map((i) => i.id);
+        fbProps['num_items'] = event.ecommerce.items.length;
+        fbProps['contents'] = event.ecommerce.items.map((i) => ({ id: i.id, quantity: i.quantity }));
+    }
+    if (
+        event.event.name === PIXEL_EVENT_NAME_COPY.ADD_TO_CART ||
+        event.event.name === PIXEL_EVENT_NAME_COPY.REMOVE_FROM_CART
+    ) {
+        fbProps['content_name'] = event.ecommerce.items.map((i) => i.name)[0];
+        fbProps['content_type'] = 'product';
+    }
+    if (event.event.name === PIXEL_EVENT_NAME_COPY.CART_VIEW) {
+        fbProps['content_name'] = 'cart';
+        fbProps['content_type'] = 'product_group';
+        fbProps['content_category'] = 'cart';
+    }
+    if (event.event.name === PIXEL_EVENT_NAME_COPY.COLLECTION_VIEW) {
+        fbProps['content_name'] = event.ecommerce.metadata.itemListName;
+        fbProps['content_type'] = 'product_group';
+    }
+    if (event.event.name === PIXEL_EVENT_NAME_COPY.PRODUCT_VIEW) {
+        if (event.ecommerce.items.length > 0) {
+            fbProps['content_name'] = event.ecommerce.items[0].name;
+        }
+        fbProps['content_type'] = 'product';
+    }
+    if (event.event.name === PIXEL_EVENT_NAME_COPY.PURCHASE) {
+        fbProps['content_name'] = 'purchase';
+        fbProps['content_category'] = 'purchase';
+        fbProps['content_type'] = 'product_group';
+        fbProps['transaction_id'] = event.ecommerce.metadata.transactionId;
+    }
+    if (
+        event.event.name === PIXEL_EVENT_NAME_COPY.BEGIN_CHECKOUT ||
+        event.event.name === PIXEL_EVENT_NAME_COPY.PAYMENT_INFO_SUBMITTED ||
+        event.event.name === PIXEL_EVENT_NAME_COPY.SHIPPING_INFO_SUBMITTED
+    ) {
+        fbProps['content_name'] = 'checkout';
+        fbProps['content_category'] = 'checkout';
+        fbProps['content_type'] = 'product';
+    }
+
+    return fbProps;
+};
+
+// a variable to store facebook user data parameter names
+const FacebookUserDataParameterNames = {
+    EMAIL: 'x-fb-ud-em',
+    PHONE: 'x-fb-ud-ph',
+    FIRST_NAME: 'x-fb-ud-fn',
+    LAST_NAME: 'x-fb-ud-ln',
+    CITY: 'x-fb-ud-ct',
+    STATE: 'x-fb-ud-st',
+    ZIP: 'x-fb-ud-zp',
+    COUNTRY: 'x-fb-ud-country',
+    EXTERNAL_ID: 'x-fb-ud-external_id',
+    CLIENT_IP_ADDRESS: 'ip_override',
+    CLIENT_USER_AGENT: 'user_agent',
+    FBC: 'x-fb-ck-fbc',
+    FBP: 'x-fb-ck-fbp',
+};
+
+// helper method to generate data layer common props
+// common props include hashed customer details to improve event match quality score
+// following parameters are required by facebook
+// see https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/customer-information-parameters/
+// for more details
+//
+// em --> hashed email (SHA256) (Trim any leading and trailing spaces. Convert all characters to lowercase.)
+// ph --> hashed phone number (SHA256)
+// fn --> first name (SHA256)
+// ln --> SHA 256 hashed last name
+// ct --> SHA 256 hashed city
+// st --> SHA 256 hashed state
+// zp --> SHA 256 hashed zip code
+// country --> SHA 256 hashed country
+// external_id --> external id
+// client_ip_address --> the ip address no hashing is required
+// client_user_agent --> the client user agent no hashing is required
+// fbc --> facebook click id (not set by us but set by facebook and should be picked up to be sent to server)
+// fbp --> facebook browser id (not set by us but set by facebook as first party cookie)
+const generateDataLayerCommonProps = function (event) {
+    const common = {};
+    common[FacebookUserDataParameterNames.FBC] = event.marketing.fbc;
+    common[FacebookUserDataParameterNames.FBP] = event.marketing.fbp;
+    if (event.customer.email) {
+        common[FacebookUserDataParameterNames.EMAIL] = generateSha256Hash(event.customer.email);
+    }
+    if (event.customer.phone) {
+        common[FacebookUserDataParameterNames.PHONE] = generateSha256Hash(event.customer.phone);
+    }
+
+    if (event.customer.firstName) {
+        common[FacebookUserDataParameterNames.FIRST_NAME] = generateSha256Hash(event.customer.firstName);
+    }
+
+    if (event.customer.lastName) {
+        common[FacebookUserDataParameterNames.LAST_NAME] = generateSha256Hash(event.customer.lastName);
+    }
+
+    if (event.customer.city) {
+        common[FacebookUserDataParameterNames.CITY] = generateSha256Hash(event.customer.city);
+    }
+
+    if (event.customer.zip) {
+        common[FacebookUserDataParameterNames.ZIP] = generateSha256Hash(event.customer.zip);
+    }
+
+    if (event.customer.country) {
+        common[FacebookUserDataParameterNames.COUNTRY] = generateSha256Hash(event.customer.country);
+    }
+
+    if (event.customer.state) {
+        common[FacebookUserDataParameterNames.STATE] = generateSha256Hash(event.customer.state);
+    }
+    if (event.customer.id) {
+        common[FacebookUserDataParameterNames.EXTERNAL_ID] = event.customer.id;
+    }
+    if (event.customer.ip) {
+        common[FacebookUserDataParameterNames.CLIENT_IP_ADDRESS] = event.customer.ip;
+    }
+    common[FacebookUserDataParameterNames.CLIENT_USER_AGENT] = event.device.userAgent;
+
+    return common;
 };
 
 // generate data layer schema from the event schema
 // the event schema is internally defined. see gateway.js
-const generateDataLayerSchema = function (event) {};
+// the GTM schema is defined below
+// We are using GTM to trigger to facebook and google
+// so we need to have both type of properties in this object
+// event --> The event name in google format
+// event_id --> The event id
+// currency --> the currency
+// value --> the total value
+// item_list_name ---> The item list name for collection view
+// item_list_id ---> The item list id for collection view
+// items ---> Array of items, item object is defined below
+//      item_id, item_name, item_brand, item_category, price, quantity
+//
+//
+// facebook properties
+// content_ids --> the ids of items
+// content_name --> the item name
+// content_category
+// content_type
+// contents --> Array of items
+//      id, quantity
+// value
+// currency
+// num_items
+const generateDataLayerSchema = function (event) {
+    const gProps = generateDataLayerGoogleProps(event);
+    const fProps = generateDataLayerFacebookProps(event);
+    const cProps = generateDataLayerCommonProps(event);
+    return _.extend({}, gProps, fProps, cProps);
+};
+
+// private helper method to get a cookie value by it's name
+// if cookie doesn't exist return undefined
+const getCookieByName = function (name) {
+    const cookies = `; ${document.cookie}`;
+    const parts = cookies.split(`; ${name}=`);
+    if (parts.length === 2) {
+        return parts.pop().split(';').shift();
+    }
+};
 
 module.exports = {
     storeData: storeData,
