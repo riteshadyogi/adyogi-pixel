@@ -17278,7 +17278,7 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
 
 // for event schema see above
 const trigger = async function trigger(event) {
-    const gtm = helper.generateDataLayerSchema(event);
+    const gtm = await helper.generateDataLayerSchema(event);
     console.log('gateway gtm schema');
     console.log(gtm);
     if (window.dataLayer) {
@@ -17368,6 +17368,7 @@ const collectCustomerDetails = function (name, event) {
     return cus;
 };
 
+// private helper method to collect device details from event schema
 const collectDeviceDetails = function (name, event) {
     const language = event.context.navigator.language;
     const encoding = event.context.document.characterSet;
@@ -17383,6 +17384,7 @@ const collectDeviceDetails = function (name, event) {
     return { resolution, viewport, language, encoding, userAgent };
 };
 
+// private helper method to collect marketing details from event schema
 const collectMarketingDetails = function (name, event) {
     // we are sending unique client id in customer details
     // that unique id can be used as external id
@@ -17398,6 +17400,7 @@ const generateSha256Hash = async function (value) {
     return [...new Uint8Array(bytes)].map((x) => x.toString(16).padStart(2, '0')).join('');
 };
 
+// private helper method to collect event details
 const collectEventDetails = async function (name, event) {
     const id = GENERATE_EVENT_ID_HASH ? await generateSha256Hash(event.id) : event.id;
     return {
@@ -17407,6 +17410,7 @@ const collectEventDetails = async function (name, event) {
     };
 };
 
+// private helper method to convert line items from shopify to internal items array
 const lineItemsToItems = function (lineItems) {
     const items = [];
     for (const li of lineItems) {
@@ -17425,6 +17429,7 @@ const lineItemsToItems = function (lineItems) {
     return items;
 };
 
+// private helper method to convert product variants from shopify to internal items array
 const productVariantsToItems = function (productVariants) {
     const items = [];
     for (const pv of productVariants) {
@@ -17443,6 +17448,7 @@ const productVariantsToItems = function (productVariants) {
     return items;
 };
 
+// private helper method to convert checkout line items from shopify to internal items array
 const checkoutLineItemsToItems = function (checkoutLineItems) {
     const items = [];
     for (const li of checkoutLineItems) {
@@ -17790,39 +17796,39 @@ const FacebookUserDataParameterNames = {
 // client_user_agent --> the client user agent no hashing is required
 // fbc --> facebook click id (not set by us but set by facebook and should be picked up to be sent to server)
 // fbp --> facebook browser id (not set by us but set by facebook as first party cookie)
-const generateDataLayerCommonProps = function (event) {
+const generateDataLayerCommonProps = async function (event) {
     const common = {};
     common[FacebookUserDataParameterNames.FBC] = event.marketing.fbc;
     common[FacebookUserDataParameterNames.FBP] = event.marketing.fbp;
     if (event.customer.email) {
-        common[FacebookUserDataParameterNames.EMAIL] = generateSha256Hash(event.customer.email);
+        common[FacebookUserDataParameterNames.EMAIL] = await generateSha256Hash(event.customer.email);
     }
     if (event.customer.phone) {
-        common[FacebookUserDataParameterNames.PHONE] = generateSha256Hash(event.customer.phone);
+        common[FacebookUserDataParameterNames.PHONE] = await generateSha256Hash(event.customer.phone);
     }
 
     if (event.customer.firstName) {
-        common[FacebookUserDataParameterNames.FIRST_NAME] = generateSha256Hash(event.customer.firstName);
+        common[FacebookUserDataParameterNames.FIRST_NAME] = await generateSha256Hash(event.customer.firstName);
     }
 
     if (event.customer.lastName) {
-        common[FacebookUserDataParameterNames.LAST_NAME] = generateSha256Hash(event.customer.lastName);
+        common[FacebookUserDataParameterNames.LAST_NAME] = await generateSha256Hash(event.customer.lastName);
     }
 
     if (event.customer.city) {
-        common[FacebookUserDataParameterNames.CITY] = generateSha256Hash(event.customer.city);
+        common[FacebookUserDataParameterNames.CITY] = await generateSha256Hash(event.customer.city);
     }
 
     if (event.customer.zip) {
-        common[FacebookUserDataParameterNames.ZIP] = generateSha256Hash(event.customer.zip);
+        common[FacebookUserDataParameterNames.ZIP] = await generateSha256Hash(event.customer.zip);
     }
 
     if (event.customer.country) {
-        common[FacebookUserDataParameterNames.COUNTRY] = generateSha256Hash(event.customer.country);
+        common[FacebookUserDataParameterNames.COUNTRY] = await generateSha256Hash(event.customer.country);
     }
 
     if (event.customer.state) {
-        common[FacebookUserDataParameterNames.STATE] = generateSha256Hash(event.customer.state);
+        common[FacebookUserDataParameterNames.STATE] = await generateSha256Hash(event.customer.state);
     }
     if (event.customer.id) {
         common[FacebookUserDataParameterNames.EXTERNAL_ID] = event.customer.id;
@@ -17860,10 +17866,10 @@ const generateDataLayerCommonProps = function (event) {
 // value
 // currency
 // num_items
-const generateDataLayerSchema = function (event) {
+const generateDataLayerSchema = async function (event) {
     const gProps = generateDataLayerGoogleProps(event);
     const fProps = generateDataLayerFacebookProps(event);
-    const cProps = generateDataLayerCommonProps(event);
+    const cProps = await generateDataLayerCommonProps(event);
     return _.extend({}, gProps, fProps, cProps);
 };
 
