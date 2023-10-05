@@ -17228,7 +17228,7 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
 
 /**
  * The event schema this gateway depends on is constant across the library.
- * By doing this we know there is one input schema which we can translate to any 
+ * By doing this we know there is one input schema which we can translate to any
  * other schema as needed by this module to export to external systems.
  */
 
@@ -17270,7 +17270,7 @@ const helper = __webpack_require__(/*! ./helper.js */ "./src/handlers/helper.js"
  *          metadata: additional event metadata based on event type
  *      }
  * }
- * 
+ *
  */
 
 // for event schema see above
@@ -17279,11 +17279,12 @@ const trigger = async function trigger(event) {
     if (window.dataLayer) {
         window.dataLayer.push(gtm);
     }
-}
+};
 
 module.exports = {
     trigger: trigger,
 };
+
 
 /***/ }),
 
@@ -17401,11 +17402,9 @@ const lineItemsToItems = function (lineItems) {
     const items = [];
     for (const li of lineItems) {
         const i = { quantity: li.quantity };
-        if (_.has(li, 'merchandise')) {
-            i.id = li.merchandise.id;
-            i.name = li.merchandise.title;
-        }
         if (_.has(li, 'merchandise.product')) {
+            i.id = li.merchandise.product.id;
+            i.name = li.merchandise.product.title;
             i.brand = li.merchandise.product.vendor;
             i.category = li.merchandise.product.type;
         }
@@ -17420,13 +17419,33 @@ const lineItemsToItems = function (lineItems) {
 const productVariantsToItems = function (productVariants) {
     const items = [];
     for (const pv of productVariants) {
-        const i = { id: pv.id, name: pv.title };
+        const i = {};
         if (_.has(pv, 'product')) {
+            i.id = pv.product.id;
+            i.name = pv.product.title;
             i.brand = pv.product.vendor;
             i.category = pv.product.type;
         }
         if (_.has(pv, 'price')) {
             i.price = pv.price.amount;
+        }
+        items.push(i);
+    }
+    return items;
+};
+
+const checkoutLineItemsToItems = function (checkoutLineItems) {
+    const items = [];
+    for (const li of checkoutLineItems) {
+        const i = { quantity: li.quantity };
+        if (_.has(li, 'variant.product')) {
+            i.id = li.variant.product.id;
+            i.name = li.variant.product.title;
+            i.brand = li.variant.product.vendor;
+            i.category = li.variant.product.type;
+        }
+        if (_.has(li, 'variant.price')) {
+            i.price = li.variant.price.amount;
         }
         items.push(i);
     }
@@ -17453,6 +17472,7 @@ const collectEcommerceDetails = function (name, event) {
         url = null,
         pathname = null,
         iln = null,
+        searchTerm = null,
         ili = null;
 
     if (name === PIXEL_EVENT_NAME_COPY.ADD_TO_CART || name === PIXEL_EVENT_NAME_COPY.REMOVE_FROM_CART) {
@@ -17472,15 +17492,17 @@ const collectEcommerceDetails = function (name, event) {
     ) {
         if (_.has(event, 'data.checkout')) {
             currency = event.data.checkout.currencyCode;
-            value = event.data.checkout.totalPrice;
+        }
+        if (_.has(event, 'data.checkout.totalPrice')) {
+            value = event.data.checkout.totalPrice.amount;
         }
         if (_.has(event, 'data.checkout.lineItems')) {
-            items = lineItemsToItems(event.data.checkout.lineItems);
+            items = checkoutLineItemsToItems(event.data.checkout.lineItems);
         }
     }
     if (name === PIXEL_EVENT_NAME_COPY.PURCHASE) {
-        if (_.has(event, 'data.checkout')) {
-            tax = event.data.checkout.totalTax;
+        if (_.has(event, 'data.checkout.totalTax')) {
+            tax = event.data.checkout.totalTax.amount;
         }
         if (_.has(event, 'data.checkout.order')) {
             ti = event.data.checkout.order.id;
@@ -17501,11 +17523,9 @@ const collectEcommerceDetails = function (name, event) {
             value = event.data.productVariant.price.amount;
         }
         const i = { quantity: 1 };
-        if (_.has(event, 'data.productVariant')) {
-            i.id = event.data.productVariant.id;
-            i.name = event.data.productVariant.title;
-        }
         if (_.has(event, 'data.productVariant.product')) {
+            i.id = event.data.productVariant.product.id;
+            i.name = event.data.productVariant.product.title;
             i.brand = event.data.productVariant.product.vendor;
             i.category = event.data.productVariant.product.type;
         }
@@ -17537,6 +17557,12 @@ const collectEcommerceDetails = function (name, event) {
         }
     }
 
+    if (name === PIXEL_EVENT_NAME_COPY.SEARCH) {
+        if (_.has(event, 'data.searchResult')) {
+            searchTerm = event.data.searchResult.query;
+        }
+    }
+
     return {
         currency,
         value,
@@ -17548,6 +17574,7 @@ const collectEcommerceDetails = function (name, event) {
             itemListId: ili,
             url: url,
             pathname: pathname,
+            searchTerm: searchTerm,
         },
     };
 };
@@ -17587,6 +17614,7 @@ module.exports = {
     prepareEventSchema: prepareEventSchema,
     generateDataLayerSchema,
     StoreKeys: StoreKeys,
+    PixelEventNames: PIXEL_EVENT_NAME_COPY,
 };
 
 
@@ -17612,6 +17640,11 @@ const IP_TIME_DELTA_MS = 30 * 60 * 1000;
  * handle the event triggered by adgoyi pixel
  */
 const handle = async function (name, event) {
+    if (name === helper.PixelEventNames.CONTACT_INFO_SUBMITTED) {
+        // right now we are not tracking contact info submitted event
+        // See README.md for more details.
+        return;
+    }
     const schema = await helper.prepareEventSchema(name, event);
     console.log('handler event schema');
     console.log(schema);
@@ -17624,7 +17657,7 @@ const handle = async function (name, event) {
         // as soon as the module is loaded, configure store
         const record = helper.fetchData(helper.StoreKeys.IP);
         const data = JSON.parse(record);
-        const exists = data && (Date.now() - data.timestamp) < IP_TIME_DELTA_MS;
+        const exists = data && Date.now() - data.timestamp < IP_TIME_DELTA_MS;
         if (!exists && window) {
             const response = await window.fetch(IP_API);
             const ipResponse = await response.json();
@@ -17632,11 +17665,13 @@ const handle = async function (name, event) {
         }
     };
 
-    init().then(() => {
-        console.info('Adyogi GTM Site: Init Success');
-    }).catch((error) => {
-        console.error('Adyogi GTM Suite: Init Failed', error);
-    });
+    init()
+        .then(() => {
+            console.info('Adyogi GTM Site: Init Success');
+        })
+        .catch((error) => {
+            console.error('Adyogi GTM Suite: Init Failed', error);
+        });
 })();
 
 module.exports = {
@@ -17750,11 +17785,13 @@ const GTM_TRACKING_ID = 'GTM-NDCN42WX';
             const p = handlers.handle(event[0], event[1]);
             promises.push(p);
         }
-        Promise.all(promises).then(() => {
-            console.log('Adyogi GTM Suite: Initial queue processed successfully!')
-        }).catch((error) => {
-            console.error('Adyogi GTM Suite: Error processing initial queue', error);
-        });
+        Promise.all(promises)
+            .then(() => {
+                console.log('Adyogi GTM Suite: Initial queue processed successfully!');
+            })
+            .catch((error) => {
+                console.error('Adyogi GTM Suite: Error processing initial queue', error);
+            });
     }
 })(window, document);
 
