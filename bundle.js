@@ -17648,7 +17648,7 @@ const FACEBOOK_EVENT_NAMES_MAPPING = {
     REMOVE_FROM_CART: 'RemoveFromCart',
     PAYMENT_INFO_SUBMITTED: 'AddPaymentInfo',
     SHIPPING_INFO_SUBMITTED: 'AddShippingInfo',
-    BEGIN_CHECKOUT: 'BeginCheckout',
+    BEGIN_CHECKOUT: 'InitiateCheckout',
     PURCHASE: 'Purchase',
 };
 
