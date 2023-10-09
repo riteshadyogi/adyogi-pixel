@@ -18032,7 +18032,7 @@ const READY_STATE_COMPLETE = 'complete';
 
 // instantiate GTM pixel
 
-const GTM_TRACKING_ID = 'GTM-NDCN42WX';
+const GTM_TRACKING_ID = 'GTM-WCLD4GW2';
 
 (function (w, d, s, l, i) {
     w[l] = w[l] || [];
