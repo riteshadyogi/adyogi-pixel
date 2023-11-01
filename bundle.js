@@ -17697,6 +17697,20 @@ const generateDataLayerGoogleProps = function (event) {
         }
         googleProps['items'] = items;
     }
+
+    // for google conversion
+    const eventName = event.event.name;
+    if (
+        eventName === PIXEL_EVENT_NAME_COPY.PRODUCT_VIEW ||
+        eventName === PIXEL_EVENT_NAME_COPY.ADD_TO_CART ||
+        eventName === PIXEL_EVENT_NAME_COPY.REMOVE_FROM_CART
+    ) {
+        // if the items length is 1, ideally it should be 1 but add check just to make sure
+        if (event.ecommerce.items && event.ecommerce.items.length === 1) {
+            googleProps['single_item_id'] = event.ecommerce.items[0].id;
+            googleProps['single_item_price'] = event.ecommerce.items[0].price;
+        }
+    }
     googleProps['transaction_id'] = event.ecommerce.metadata.transactionId;
     googleProps['tax'] = event.ecommerce.metadata.tax;
     googleProps['page_location'] = event.ecommerce.metadata.url;
