@@ -17354,13 +17354,30 @@ const collectCustomerDetails = function (name, event) {
             cus.email = event.data.checkout.email;
             cus.phone = event.data.checkout.phone;
         }
+        // try to find out the phone number from billing address or shipping address
+        if (_.isEmpty(cus.phone) && _.has(event, 'data.checkout.shippingAddress')) {
+            cus.phone = event.data.checkout.shippingAddress.phone;
+        }
+        if (_.isEmpty(cus.phone) && _.has(event, 'data.checkout.billingAddress')) {
+            cus.phone = event.data.checkout.billingAddress.phone;
+        }
+        let found = false;
         if (_.has(event, 'data.checkout.shippingAddress')) {
+            found = true;
             cus.city = event.data.checkout.shippingAddress.city;
             cus.firstName = event.data.checkout.shippingAddress.firstName;
             cus.lastName = event.data.checkout.shippingAddress.lastName;
             cus.country = event.data.checkout.shippingAddress.countryCode;
             cus.state = event.data.checkout.shippingAddress.province;
             cus.zip = event.data.checkout.shippingAddress.zip;
+        }
+        if (!found && _.has(event, 'data.checkout.billingAddress')) {
+            cus.city = event.data.checkout.billingAddress.city;
+            cus.firstName = event.data.checkout.billingAddress.firstName;
+            cus.lastName = event.data.checkout.billingAddress.lastName;
+            cus.country = event.data.checkout.billingAddress.countryCode;
+            cus.state = event.data.checkout.billingAddress.province;
+            cus.zip = event.data.checkout.billingAddress.zip;
         }
     }
     return cus;
