@@ -17330,6 +17330,7 @@ const FBC_COOKIE_NAME = '_fbc';
 // store keys
 const StoreKeys = {
     IP: 'AGDL_IP',
+    CUSTOMER_DETAILS: 'AGDL_CD'
 };
 
 // NOTE: Shopify web pixel api doesn't provide customer details like name, email, phone etc
@@ -17337,7 +17338,7 @@ const StoreKeys = {
 // save those details in local or session store and then use those details for any subsequent events
 const collectCustomerDetails = function (name, event) {
     const record = fetchData(StoreKeys.IP);
-    const cus = {
+    let cus = {
         id: event.clientId,
     };
     if (record) {
@@ -17380,6 +17381,16 @@ const collectCustomerDetails = function (name, event) {
             cus.zip = event.data.checkout.billingAddress.zip;
         }
     }
+    // fetch the customer details from local store
+    const localStoreCustomerDetails = fetchData(StoreKeys.CUSTOMER_DETAILS);
+    // if the details are present
+    if (!_.isEmpty(localStoreCustomerDetails)) {
+        const parsed = JSON.parse(localStoreCustomerDetails);
+        // merge the two objects
+        cus = _.merge(parsed, cus);
+    }
+    // before returning from here, save the current customer details into local store
+    storeData(StoreKeys.CUSTOMER_DETAILS, JSON.stringify(cus));
     return cus;
 };
 
